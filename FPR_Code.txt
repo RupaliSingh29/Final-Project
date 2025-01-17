@@ -1,0 +1,796 @@
+pip install librosa
+pip install --upgrade librosa
+
+
+#Importing necessary libraries
+
+import numpy as np
+import pandas as pd
+
+import seaborn as sns
+import math
+
+import os
+import librosa as lb 
+
+import matplotlib.pyplot as plt
+from matplotlib.cbook import boxplot_stats
+
+
+# Load the Diagnosis .csv file 
+Diagnosis = pd.read_csv(r"C:\Users\22rup\OneDrive\Desktop\FINAL PROJECT\archive (1)\Respiratory_Sound_Database\Respiratory_Sound_Database\patient_diagnosis.csv",names=['PId', 'Diagnosis'])
+Diagnosis
+
+
+#Display the unique diagnosis labels for 'Diagnosis' columns
+diag = Diagnosis['Diagnosis'].unique()
+diag
+
+#Count the number of times each unique diagnosis appears in 'Diagnosis' column 
+Diagnosis['Diagnosis'].value_counts()
+
+#Plot the 'Diagnosis' column
+sns.countplot(data=Diagnosis, x='Diagnosis', color='skyblue')
+plt.xticks(rotation=90) 
+plt.show()
+
+#Split the file names at the period
+#Create a list of file names for those files that have a ".txt" extension 
+path=r"C:\Users\22rup\OneDrive\Desktop\FINAL PROJECT\archive (1)\Respiratory_Sound_Database\Respiratory_Sound_Database\audio_and_txt_files"
+files=[s.split('.')[0] for s in os.listdir(path) if '.txt' in s]
+
+#Data is the original signal
+#Add random noise to the data 
+def add_noise(data, x):                      #x controls the amount of noise to add 
+    noise = np.random.randn(len(data))       #Genrate random noise with same length of data
+    data_noise = data + x * noise            #Add the scaled noise to original data
+    return data_noise                        #Return the noisy signal
+
+
+#Shift the data with number of samples
+def shift(data, x):                          #x is the number of positions to shift the data
+    return np.roll(data, x)                  #Shift data with x samples and return the signal
+ 
+    
+#Stretch or compress the data in time    
+def stretch(data, rate):                     #rate is the stretching factor(rate>1 stretches, rate<1 compresses)
+    data_stretched = lb.effects.time_stretch(data, rate=rate) #apply time stretching to the data
+    return data_stretched                    #return stretched signal
+
+
+#shift the pitch of the data without changing its duration
+def pitch_shift(data, rate):                 #rate is the number of steps to shift the pitch
+    data_pitch_shifted = lb.effects.pitch_shift(data, sr=22050, n_steps=rate) # apply pitch shifting to the data
+    return data_pitch_shifted                #return pitch shifted signal
+
+import librosa as lb
+#Visualize original audio signal and augmented versions of it
+def show_audio(audio_path):
+    y, sr = lb.load(audio_path)
+    #Data augmentation
+    y_noise = add_noise(y, 0.0007)                # add small amount of noise
+    y_shift = shift(y, 3000)                      #shift signal by 3000
+    y_stretch_1 = stretch(y, 1.2)                 #stretch the signal speeding up
+    y_stretch_2 = stretch(y, 0.8)                 #compress the signal speeding down
+    y_pitch_shift = pitch_shift(y, 3)             #shift the pitch by 3 semitones
+    
+    plt.figure(figsize=(20, 8))
+    
+    #Plot original signal
+    plt.subplot(3, 2, 1)
+    lb.display.waveshow(y, sr=sr)
+    plt.title('Original')
+
+    #plot the signal with added noise
+    plt.subplot(3, 2, 2)
+    lb.display.waveshow(y_noise, sr=sr)
+    plt.title('Noise')
+    
+    #plot the shifted signal
+    plt.subplot(3, 2, 3)
+    lb.display.waveshow(y_shift, sr=sr)
+    plt.title('Shift')
+    
+    #plot the stretched signal rate>1
+    plt.subplot(3, 2, 4)
+    lb.display.waveshow(y_stretch_1, sr=sr)
+    plt.title('Stretch 1')
+    
+    #plot the stretched signal rate<1
+    plt.subplot(3, 2, 5)
+    lb.display.waveshow(y_stretch_2, sr=sr)
+    plt.title('Stretch 2')
+    
+    #Plot the pitch-shifted signal
+    plt.subplot(3, 2, 6)
+    lb.display.waveshow(y_pitch_shift, sr=sr)
+    plt.title('Pitch Shift')
+
+    #adjust the layout to prevent overlap
+    plt.tight_layout()
+
+#Visualize MFCC feature of original and augmented data
+def show_audio_features(audio_path):
+    y, sr = lb.load(audio_path)
+    #Data augmentation
+    y_noise = add_noise(y , 0.0007)                        # add small amount of noise
+    y_shift = shift(y,3000)                                #shift signal by 3000
+    y_stretch_1 = stretch(y, 1.2)                          #stretch the signal speeding up
+    y_stretch_2 = stretch(y, 0.8)                          #compress the signal speeding down
+    y_pitch_shift = pitch_shift(y, 3)                      #shift the pitch by 3 semitones       
+     
+    #Compute MFCC for each version of audio file
+    y = lb.feature.mfcc(y=y, sr=sr, n_mfcc=50)
+    y_noise = lb.feature.mfcc(y=y_noise, sr=sr, n_mfcc=50)
+    y_shift = lb.feature.mfcc(y=y_shift, sr=sr, n_mfcc=50)
+    y_stretch_1 = lb.feature.mfcc(y=y_stretch_1, sr=sr, n_mfcc=50)
+    y_stretch_2 = lb.feature.mfcc(y=y_stretch_2, sr=sr, n_mfcc=50)
+    y_pitch_shift = lb.feature.mfcc(y=y_pitch_shift, sr=sr, n_mfcc=50)
+    
+    plt.figure(figsize=(20, 8))
+    
+    #Plot the MFCCs of the original audio
+    plt.subplot(3,2,1)
+    lb.display.specshow(lb.power_to_db(y,ref=np.max),
+                             y_axis='mel',
+                             fmax=8000,
+                             x_axis='time')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Original')
+
+    #Plot the MFCCs of the noisy audio
+    plt.subplot(3,2,2)
+    lb.display.specshow(lb.power_to_db(y_noise,ref=np.max),
+                             y_axis='mel',
+                             fmax=8000,
+                             x_axis='time')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Noise')
+
+    #Plot the MFCCs of the shifted audio
+    plt.subplot(3,2,3)
+    lb.display.specshow(lb.power_to_db(y_shift,ref=np.max),
+                             y_axis='mel',
+                             fmax=8000,
+                             x_axis='time')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Shift')
+    
+    #Plot the MFCCs of the time-stretched(rate>1) audio
+    plt.subplot(3,2,4)
+    lb.display.specshow(lb.power_to_db(y_stretch_1,ref=np.max),
+                             y_axis='mel',
+                             fmax=8000,
+                             x_axis='time')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Stretch 1')
+    
+    #Plot the MFCCs of the time-compressed(rate<1) audio
+    plt.subplot(3,2,5)
+    lb.display.specshow(lb.power_to_db(y_stretch_2,ref=np.max),
+                             y_axis='mel',
+                             fmax=8000,
+                             x_axis='time')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Stretch 2')
+    
+    #Plot the MFCCs of the pitch-shifted audio
+    plt.subplot(3,2,6)
+    lb.display.specshow(lb.power_to_db(y_pitch_shift,ref=np.max),
+                             y_axis='mel',
+                             fmax=8000,
+                             x_axis='time')
+    plt.colorbar(format='%+2.0f dB')
+    plt.title('Pitch Shift')
+    
+    
+    #adjust the layout to prevent overlap
+    plt.tight_layout()
+
+#Visualize the original audio signal and various augmented versions for a specific audio file
+show_audio(r"C:\Users\22rup\OneDrive\Desktop\FINAL PROJECT\archive (1)\Respiratory_Sound_Database\Respiratory_Sound_Database\audio_and_txt_files\105_1b1_Tc_sc_Meditron.wav")
+
+#Visualize MFCC feature of original and augmented data
+show_audio_features(r"C:\Users\22rup\OneDrive\Desktop\FINAL PROJECT\archive (1)\Respiratory_Sound_Database\Respiratory_Sound_Database\audio_and_txt_files\105_1b1_Tc_sc_Meditron.wav")
+
+def mfccs_feature_extraction(dir_):
+
+#Initialize empty lists
+    X_ = []
+    y_ = []
+    
+#specific logic for handling COPD files
+    COPD = []
+    copd_count = 0
+
+    data = Diagnosis  #Load diagnosis data
+    features = 52     #define the number of MFCC features to extract
+    
+    #iterate over each file in the given directory
+    for soundDir in os.listdir(dir_):
+        # Process only '.wav' files and exclude specific patient IDs ('103', '108', '115')
+        if soundDir[-3:] == 'wav' and soundDir[:3] not in ['103', '108', '115']:
+            #Get the diagnosis for the patients based on the patient id
+            p = list(data[data['PId'] == int(soundDir[:3])]['Diagnosis'])[0]
+            
+            #Process files with a COPD diagnosis
+            if p == 'COPD':
+                if (soundDir[:6] in COPD) and copd_count < 2:
+                    data_x, sampling_rate = lb.load(dir_ + soundDir, res_type='kaiser_fast')
+                    mfccs = np.mean(lb.feature.mfcc(y=data_x, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    COPD.append(soundDir[:6])
+                    copd_count += 1
+                    X_.append(mfccs)
+                    y_.append(list(data[data['PId'] == int(soundDir[:3])]['Diagnosis'])[0])
+                    
+                #If the patient's data has not been encountered, reset the COPD count and process the file    
+                if soundDir[:6] not in COPD:
+                    data_x, sampling_rate = lb.load(dir_ + soundDir, res_type='kaiser_fast')
+                    mfccs = np.mean(lb.feature.mfcc(y=data_x, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    COPD.append(soundDir[:6])
+                    copd_count = 0
+                    X_.append(mfccs)
+                    y_.append(list(data[data['PId'] == int(soundDir[:3])]['Diagnosis'])[0])
+            
+            #process files with non COPD diagnoses
+            if p != 'COPD':
+                if (p == 'Bronchiectasis') or (p == 'Bronchiolitis'):
+                    data_x, sampling_rate = lb.load(dir_ + soundDir, res_type='kaiser_fast')
+                    mfccs = np.mean(lb.feature.mfcc(y=data_x, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs)
+                    y_.append('Bronchiolitis')
+                    
+                    #apply noise and extract features
+                    data_noise = add_noise(data_x, 0.001)
+                    mfccs_noise = np.mean(lb.feature.mfcc(y=data_noise, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_noise)
+                    y_.append('Bronchiolitis')
+
+                    #apply time shift and extract features
+                    data_shift = shift(data_x, 1600)
+                    mfccs_shift = np.mean(lb.feature.mfcc(y=data_shift, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_shift)
+                    y_.append('Bronchiolitis')
+                    
+                    #apply time stretch (speed up) and extract features
+                    data_stretch = stretch(data_x, 1.2)
+                    mfccs_stretch = np.mean(lb.feature.mfcc(y=data_stretch, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_stretch)
+                    y_.append('Bronchiolitis')
+                    
+                    #apply time stretch (speed down) and extract features
+                    data_stretch_2 = stretch(data_x, 0.8)
+                    mfccs_stretch_2 = np.mean(lb.feature.mfcc(y=data_stretch_2, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_stretch_2)
+                    y_.append('Bronchiolitis')
+                    
+                    #Apply pitch shift and extract MFCC features
+                    data_pitch_shift = pitch_shift(data_x, 3)
+                    mfccs_pitch_shift = np.mean(lb.feature.mfcc(y=data_pitch_shift, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_pitch_shift)
+                    y_.append('Bronchiolitis')
+                    
+                 #For other diagnoses, apply similar augmentation and extraction as above but with the original label    
+                else: 
+                    data_x, sampling_rate = lb.load(dir_ + soundDir, res_type='kaiser_fast')
+                    mfccs = np.mean(lb.feature.mfcc(y=data_x, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs)
+                    y_.append(list(data[data['PId'] == int(soundDir[:3])]['Diagnosis'])[0])
+                    
+                    data_noise = add_noise(data_x, 0.001)
+                    mfccs_noise = np.mean(lb.feature.mfcc(y=data_noise, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_noise)
+                    y_.append(p)
+
+                    data_shift = shift(data_x, 1600)
+                    mfccs_shift = np.mean(lb.feature.mfcc(y=data_shift, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_shift)
+                    y_.append(p)
+                    
+                    data_stretch = stretch(data_x, 1.2)
+                    mfccs_stretch = np.mean(lb.feature.mfcc(y=data_stretch, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_stretch)
+                    y_.append(p)
+                    
+                    data_stretch_2 = stretch(data_x, 0.8)
+                    mfccs_stretch_2 = np.mean(lb.feature.mfcc(y=data_stretch_2, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_stretch_2)
+                    y_.append(p)
+                    
+                    data_pitch_shift = pitch_shift(data_x, 3)
+                    mfccs_pitch_shift = np.mean(lb.feature.mfcc(y=data_pitch_shift, sr=sampling_rate, n_mfcc=features).T, axis=0)
+                    X_.append(mfccs_pitch_shift)
+                    y_.append(p)
+    
+    #Convert the feature and label lists to NumPy arrays
+    X_data = np.array(X_)
+    y_data = np.array(y_)
+    
+    return X_data, y_data 
+
+pip install resampy
+
+#Extract MFCC features from all the audio files in the specified directory
+x_mfccs, y = mfccs_feature_extraction(r"C:\Users\22rup\OneDrive\Desktop\FINAL PROJECT\archive (1)\Respiratory_Sound_Database\Respiratory_Sound_Database\audio_and_txt_files\\")
+x_mfccs
+
+def augmented_lables_count(lables):
+    #numpy's unique function to find the unique labels and their corresponding counts
+    #'unique' will hold the unique labels, and 'counts' will hold the number of occurrences for each label
+    unique, counts = np.unique(lables, return_counts=True)
+    data_count = dict(zip(unique, counts))
+
+    data = data_count
+
+    #Extract the list of diseases and their respective counts
+    courses = list(data.keys())
+    values = list(data.values())
+
+    #Create a bar plot to visualize the distribution of the diseases
+    fig = plt.figure(figsize = (10, 5))
+
+    plt.bar(courses, values, color =['green','orange','red','yellow','black','blue'],
+            width = 0.4)
+
+    plt.xlabel("Diseases")
+    plt.ylabel("Count")
+    plt.title("Count of each disease")
+    plt.show()
+
+    print (data_count)
+
+augmented_lables_count(y)
+
+#Reshape the label array 'y' to a column vector with shape (n_samples, 1)
+y_data_encode = y.reshape(y.shape[0],1)
+
+#Apply one-hot encoding for 'COPD' by replacing any occurrence of 'COPD' with the vector [1, 0, 0, 0, 0]
+y_data_encode = np.where(y_data_encode == 'COPD',np.array([1,0,0,0,0]).reshape(1,5) , y_data_encode)
+
+#Apply one-hot encoding for 'Bronchiolitis' by replacing any occurrence of 'Bronchiolitis' with the vector [0, 1, 0, 0, 0]
+y_data_encode = np.where(y_data_encode == 'Bronchiolitis',np.array([0,1,0,0,0]).reshape(1,5) , y_data_encode)
+
+#Apply one-hot encoding for 'Pneumonia' by replacing any occurrence of 'Pneumonia' with the vector [0, 0, 1, 0, 0]
+y_data_encode = np.where(y_data_encode == 'Pneumonia',np.array([0,0,1,0,0]).reshape(1,5) , y_data_encode)
+
+#Apply one-hot encoding for 'URTI' by replacing any occurrence of 'URTI' with the vector [0, 0, 0, 1, 0]
+y_data_encode = np.where(y_data_encode == 'URTI',np.array([0,0,0,1,0]).reshape(1,5) , y_data_encode)
+
+#Apply one-hot encoding for 'Healthy' by replacing any occurrence of 'Healthy' with the vector [0, 0, 0, 0, 1]
+y_data_encode = np.where(y_data_encode == 'Healthy',np.array([0,0,0,0,1]).reshape(1,5) , y_data_encode)
+
+#Convert the encoded labels to a float64 data type for consistency and compatibility with further processing
+Y_data = y_data_encode.astype('float64')
+
+#Convert the list of MFCC features into an array
+mfccs_features = np.array(x_mfccs)
+
+#Convert the list of one-hot encoded labels into an array.
+lables = np.array(Y_data)
+
+mfccs_features.shape , lables.shape
+
+mfccs_features
+
+from sklearn.model_selection import train_test_split
+
+
+# First split: Train and Validation sets
+mfcc_train, mfcc_val, lables_train, lables_val = train_test_split(
+    mfccs_features, lables, test_size=0.175, random_state=10, stratify=lables
+)
+
+# Second split: Train and Test sets
+mfcc_train, mfcc_test, lables_train, lables_test = train_test_split(
+    mfcc_train, lables_train, test_size=0.075, random_state=10, stratify=lables_train
+)
+
+# Print shapes of the resulting datasets
+print(f"mfcc_train shape: {mfcc_train.shape}, mfcc_val shape: {mfcc_val.shape}, mfcc_test shape: {mfcc_test.shape}")
+print(f"lables_train shape: {lables_train.shape}, lables_val shape: {lables_val.shape}, lables_test shape: {lables_test.shape}")
+
+pip install optree
+
+pip install --upgrade tensorflow
+
+print(mfccs_features.shape)
+
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropout
+from tensorflow.keras.layers import LSTM, BatchNormalization
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.layers import Input, Attention, Concatenate, LayerNormalization
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.metrics import classification_report, confusion_matrix, precision_score, recall_score
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, Flatten, Dense, Dropout, Input
+from tensorflow.keras.optimizers import Adam
+
+# Define the model
+model = Sequential()
+
+# Add an Input layer with shape
+model.add(Input(shape=(mfccs_features.shape[1], 1)))  # Input shape is (time steps, features)
+
+# Add Conv1D layers
+model.add(Conv1D(filters=64, kernel_size=5, activation='relu'))
+model.add(MaxPooling1D(pool_size=2))
+model.add(Conv1D(filters=128, kernel_size=5, activation='relu'))
+model.add(MaxPooling1D(pool_size=2))
+model.add(Conv1D(filters=256, kernel_size=5, activation='relu'))
+model.add(MaxPooling1D(pool_size=2))
+
+# Flatten and add dense layers
+model.add(Flatten())
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(5, activation='softmax'))  # 5 classes for classification
+
+# Compile the model
+model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Print model summary
+model.summary()
+
+# Assuming you have the history object from model.fit()
+history = model.fit(
+    mfcc_train, lables_train,
+    epochs=30,  
+    batch_size=42,  
+    validation_data=(mfcc_val, lables_val),
+    verbose=1
+)
+
+# Plot training & validation accuracy values
+plt.figure(figsize=(10, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend(['Train', 'Validation'])
+plt.grid()
+
+# Plot training & validation loss values
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend(['Train', 'Validation'])
+plt.grid()
+
+plt.show()
+
+test_loss, test_accuracy = model.evaluate(mfcc_test, lables_test)
+print(f"Test loss: {test_loss:.4f}")
+print(f"Test accuracy: {test_accuracy:.4f}")
+
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Get predictions
+y_pred = model.predict(mfcc_test)
+y_pred_classes = np.argmax(y_pred, axis=1)  # Convert predictions to class labels
+
+# Convert y_test to class labels
+y_test_classes = np.argmax(lables_test, axis=1)
+
+# Compute classification report
+report = classification_report(y_test_classes, y_pred_classes, target_names=['COPD', 'Bronchiolitis', 'Pneumonia', 'URTI', 'Healthy'])
+print("Classification Report:\n", report)
+
+# Compute confusion matrix
+cm = confusion_matrix(y_test_classes, y_pred_classes, labels=[0, 1, 2, 3, 4])
+
+# Plot confusion matrix
+plt.figure(figsize=(10, 7))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['COPD', 'Bronchiolitis', 'Pneumonia', 'URTI', 'Healthy'], yticklabels=['COPD', 'Bronchiolitis', 'Pneumonia', 'URTI', 'Healthy'])
+plt.xlabel('Predicted Labels')
+plt.ylabel('True Labels')
+plt.title('Confusion Matrix')
+plt.show()
+
+x_train_lstm = np.expand_dims(mfcc_train,axis=2)
+x_val_lstm = np.expand_dims(mfcc_val,axis=2)
+x_test_lstm = np.expand_dims(mfcc_test,axis=2)
+
+from tensorflow.keras.layers import LSTM, BatchNormalization
+# Initialize a Sequential model
+lstm_model = Sequential()
+
+#1st Convolutional Layer:Conv1D layer with 2048 filters, kernel size of 5, and 'same' padding to maintain the input shape.
+#ReLU activation is used to introduce non-linearity.
+#Input shape is specified as (52, 1), where 52 is the number of features from MFCC and 1 is the single channel.
+lstm_model.add(Conv1D(2048, kernel_size=5, strides=1, padding='same', activation='relu', input_shape=(52, 1)))
+#MaxPooling Layer:Reduces the dimensionality of the output from the Conv1D layer by taking the maximum value in each pool.
+#Pool size of 2 reduces the feature map size by half, with 'same' padding to preserve spatial dimensions.
+lstm_model.add(MaxPooling1D(pool_size=2, strides = 2, padding = 'same'))
+#Batch Normalization Layer:Normalizes the output of the previous layer to stabilize and speed up the training process.
+lstm_model.add(BatchNormalization())
+
+
+#2nd Convolutional Layer:Conv1D layer with 1024 filters, similar kernel size and padding.
+#The input shape is not specified again because Keras automatically infers it from the previous layer.
+lstm_model.add(Conv1D(1024, kernel_size=5, strides=1, padding='same', activation='relu', input_shape=(52, 1)))
+#MaxPooling and Batch Normalization:Similar to the first set, these layers further downsample and normalize the feature maps.
+lstm_model.add(MaxPooling1D(pool_size=2, strides = 2, padding = 'same'))
+lstm_model.add(BatchNormalization())
+
+
+# 3rd Convolutional Layer:Conv1D layer with 512 filters, continuing to reduce the feature map size and learn more complex features.
+lstm_model.add(Conv1D(512, kernel_size=5, strides=1, padding='same', activation='relu'))
+#MaxPooling and Batch Normalization:these layers downsample and normalize.
+lstm_model.add(MaxPooling1D(pool_size=2, strides = 2, padding = 'same'))
+lstm_model.add(BatchNormalization())
+
+#1st LSTM Layer:LSTM layer with 256 units, set to return sequences (i.e. the entire output sequence is returned).
+lstm_model.add(LSTM(256, return_sequences=True))
+#2nd LSTM Layer:LSTM layer with 128 units. This layer returns only the last output in the output sequence.
+lstm_model.add(LSTM(128))
+
+
+#Fully Connected Layer:Dense layer with 64 units and ReLU activation.
+#A Dropout layer with 0.5 dropout rate is added to prevent overfitting by randomly dropping out half of the neurons during training.
+lstm_model.add(Dense(64, activation='relu'))
+lstm_model.add(Dropout(0.5))
+
+#Another Fully Connected Layer:Dense layer with 32 units and ReLU activation, followed by another Dropout layer with 0.5 dropout rate.
+lstm_model.add(Dense(32, activation='relu'))
+lstm_model.add(Dropout(0.5))
+
+#Output Layer:Final Dense layer with 5 units and softmax activation, corresponding to the 5 classes in the classification problem.
+#The softmax activation outputs probabilities for each class.
+lstm_model.add(Dense(5, activation='softmax'))
+
+#Summarize the model architecture:
+lstm_model.summary()
+
+optimiser = tf.keras.optimizers.Adam(learning_rate = 0.0001)
+lstm_model.compile(optimizer=optimiser,
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+
+cb = [EarlyStopping(patience=20,monitor='val_accuracy',mode='max',restore_best_weights=True)]
+
+history = lstm_model.fit(x_train_lstm, lables_train, batch_size=12, epochs=250, validation_data=(x_val_lstm, lables_val),callbacks = cb )
+
+test_loss, test_accuracy = lstm_model.evaluate(x_test_lstm, lables_test)
+print(f"Test loss: {test_loss:.4f}")
+print(f"Test accuracy: {test_accuracy:.4f}")
+
+lstm_model.evaluate(x_val_lstm, lables_val)
+
+plt.figure(figsize=(10, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend(['Train', 'Validation'])
+plt.grid()
+
+# Plot training & validation loss values
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend(['Train', 'Validation'])
+plt.grid()
+
+plt.show()
+
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Step 1: Predict the labels for your test data
+y_predict = lstm_model.predict(x_test_lstm)
+
+# Step 2: Convert predictions and true labels from one-hot encoding to class labels
+y_predict_class = np.argmax(y_predict, axis=1)
+y_true_class = np.argmax(lables_test, axis=1)
+
+# Define the label names
+label_names = ['COPD', 'Bronchiolitis', 'Pneumonia', 'URTI', 'Healthy']
+
+# Step 3: Create the confusion matrix
+cm = confusion_matrix(y_true_class, y_predict_class)
+
+# Step 4: Plot the confusion matrix
+plt.figure(figsize=(10, 7))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=label_names, yticklabels=label_names)
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Step 5: Calculate precision, recall, and F1-score
+report = classification_report(y_true_class, y_predict_class, target_names=label_names)
+print(report)
+
+import tensorflow as tf
+from tensorflow.keras.layers import Dense, LSTM, Conv1D, MaxPooling1D, BatchNormalization, Dropout, Input, Flatten, Layer
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+import tensorflow.keras.backend as K
+
+# Attention Mechanism
+class CustomAttention(Layer):
+    def __init__(self, **kwargs):
+        super(CustomAttention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.W_att = self.add_weight(name="att_weight", shape=(input_shape[-1], input_shape[-1]), initializer="glorot_uniform", trainable=True)
+        self.b_att = self.add_weight(name="att_bias", shape=(input_shape[-1],), initializer="zeros", trainable=True)
+        self.u_att = self.add_weight(name="att_u", shape=(input_shape[-1],), initializer="glorot_uniform", trainable=True)
+        super(CustomAttention, self).build(input_shape)
+
+    def call(self, inputs):
+        # Apply a fully connected layer with tanh activation
+        u_scores = K.tanh(K.dot(inputs, self.W_att) + self.b_att)
+        
+        # Calculate the attention scores
+        att_scores = K.dot(u_scores, K.expand_dims(self.u_att, -1))
+        att_scores = K.squeeze(att_scores, -1)  # Remove the last dimension
+        att_scores = K.exp(att_scores)
+        
+        # Normalize the scores
+        att_weights = att_scores / K.sum(att_scores, axis=1, keepdims=True) + K.epsilon()
+        
+        # Apply the attention scores to the context vector
+        weighted_input = inputs * K.expand_dims(att_weights, -1)
+        context_vector = K.sum(weighted_input, axis=1)
+        
+        return context_vector
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[-1])
+
+# Define the model
+custom_lstm_model = Sequential()
+
+custom_lstm_model.add(Conv1D(2048, kernel_size=5, strides=1, padding='same', activation='relu', input_shape=(52, 1)))
+custom_lstm_model.add(MaxPooling1D(pool_size=2, strides=2, padding='same'))
+custom_lstm_model.add(BatchNormalization())
+
+custom_lstm_model.add(Conv1D(1024, kernel_size=5, strides=1, padding='same', activation='relu'))
+custom_lstm_model.add(MaxPooling1D(pool_size=2, strides=2, padding='same'))
+custom_lstm_model.add(BatchNormalization())
+
+custom_lstm_model.add(Conv1D(512, kernel_size=5, strides=1, padding='same', activation='relu'))
+custom_lstm_model.add(MaxPooling1D(pool_size=2, strides=2, padding='same'))
+custom_lstm_model.add(BatchNormalization())
+
+custom_lstm_model.add(LSTM(256, return_sequences=True))
+custom_lstm_model.add(LSTM(128, return_sequences=True))
+
+# Add Custom Attention layer
+custom_lstm_model.add(CustomAttention())
+
+custom_lstm_model.add(Dense(64, activation='relu'))
+custom_lstm_model.add(Dropout(0.5))
+
+custom_lstm_model.add(Dense(32, activation='relu'))
+custom_lstm_model.add(Dropout(0.5))
+
+custom_lstm_model.add(Dense(5, activation='softmax'))
+
+custom_lstm_model.summary()
+
+# Compile the model
+opt = Adam(learning_rate=0.0001)
+custom_lstm_model.compile(optimizer=opt, loss='categorical_crossentropy', metrics=['accuracy'])
+
+# Define EarlyStopping callback
+callbacks_list = [EarlyStopping(patience=20, monitor='val_accuracy', mode='max', restore_best_weights=True)]
+
+# Train the model
+training_history = custom_lstm_model.fit(x_train_lstm, lables_train, batch_size=10, epochs=250, validation_data=(x_val_lstm, lables_val), callbacks=callbacks_list)
+
+test_loss, test_accuracy = custom_lstm_model.evaluate(x_test_lstm, lables_test)
+print(f"Test loss: {test_loss:.4f}")
+print(f"Test accuracy: {test_accuracy:.4f}")
+
+import matplotlib.pyplot as plt
+
+# Plot training & validation accuracy values
+plt.figure(figsize=(10, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(training_history.history['accuracy'])
+plt.plot(training_history.history['val_accuracy'])
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend(['Train', 'Validation'], loc='upper left')
+plt.grid(True)
+
+# Plot training & validation loss values
+plt.subplot(1, 2, 2)
+plt.plot(training_history.history['loss'])
+plt.plot(training_history.history['val_loss'])
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend(['Train', 'Validation'], loc='upper left')
+plt.grid(True)
+
+plt.show()
+
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+import numpy as np
+
+# Step 1: Predict the labels for your test data
+predictions = custom_lstm_model.predict(x_test_lstm)
+
+# Step 2: Convert predictions and true labels from one-hot encoding to class labels
+predicted_classes = np.argmax(predictions, axis=1)
+true_classes = np.argmax(lables_test, axis=1)
+
+# Step 3: Create the confusion matrix
+conf_matrix = confusion_matrix(true_classes, predicted_classes)
+
+# Step 4: Plot the confusion matrix
+plt.figure(figsize=(10, 7))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Class 0', 'Class 1', 'Class 2', 'Class 3', 'Class 4'], yticklabels=['Class 0', 'Class 1', 'Class 2', 'Class 3', 'Class 4'])
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Step 5: Calculate precision, recall, and F1-score
+classification_report_result = classification_report(true_classes, predicted_classes, target_names=['Class 0', 'Class 1', 'Class 2', 'Class 3', 'Class 4'])
+print("Classification Report:\n", classification_report_result)
+
+import numpy as np
+
+# Assuming you have your test data in 'x_test_lstm'
+# Get the probabilities for each class
+probabilities = custom_lstm_model.predict(x_test_lstm)
+
+# Assuming the class names are stored in this list (replace with your actual class names)
+class_names = ['COPD', 'Bronchiolitis', 'Pneumonia', 'URTI', 'Healthy']
+
+# Loop through each sample and identify the top two predictions
+for i, prob in enumerate(probabilities):
+    # Get the indices of the largest and second-largest probabilities
+    top_two_indices = np.argsort(prob)[-2:][::-1]  # Sort and get the last two indices in descending order
+
+    # Get the corresponding class names
+    top_class = class_names[top_two_indices[0]]
+    second_class = class_names[top_two_indices[1]]
+
+    # Get the corresponding probabilities
+    top_prob = prob[top_two_indices[0]]
+    second_prob = prob[top_two_indices[1]]
+
+    # Determine if the largest probability is exactly 1
+    if top_prob == 1.0:
+        # If the largest probability is 1, omit the second-largest class
+        print(f"The prediction for the patient is '{top_class}' with a probability of {top_prob:.5f}.")
+    else:
+        # If the largest probability is less than 1 and the second-largest is 'Healthy'
+        if second_class == 'Healthy':
+            print(f"The prediction for the patient is '{top_class}' with a probability of {top_prob:.5f} but can also be termed as '{second_class}' with a probability of {second_prob:.5f}.")
+        else:
+            print(f"The prediction for the patient is '{top_class}' with a probability of {top_prob:.5f} but is at risk of '{second_class}' with a probability of {second_prob:.5f}.")
+
